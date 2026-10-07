@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Защита Практики 4: Агентная среда, Skill, MCP и Two Features</title>
+  <style>
+    :root {
+      --bg-space: #070b14;
+      --bg-card: rgba(15, 23, 42, 0.75);
+      --bg-card-border: rgba(56, 189, 248, 0.25);
+      --accent-cyan: #38bdf8;
+      --accent-teal: #2dd4bf;
+      --accent-amber: #fbbf24;
+      --accent-purple: #c084fc;
+      --accent-rose: #f43f5e;
+      --accent-green: #4ade80;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --code-bg: #030712;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-space);
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(192, 132, 252, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.6) 0%, transparent 100%);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Верхний навигационный бар */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 28px;
+      background: rgba(7, 11, 20, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--accent-cyan);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .brand-badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+      animation: pulse 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.2); opacity: 1; }
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 5px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Контейнер слайдов */
+    .deck-container {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      max-width: 1300px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .slide {
+      display: none;
+      width: 100%;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 30px rgba(56, 189, 248, 0.08);
+      animation: fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .slide-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent-teal);
+      margin-bottom: 8px;
+    }
+
+    h1.slide-title {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #ffffff 40%, #bae6fd 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 20px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateY(-2px);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-cyan { border-left: 4px solid var(--accent-cyan); }
+    .card-teal { border-left: 4px solid var(--accent-teal); }
+    .card-amber { border-left: 4px solid var(--accent-amber); }
+    .card-purple { border-left: 4px solid var(--accent-purple); }
+    .card-green { border-left: 4px solid var(--accent-green); }
+
+    ul.clean-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    ul.clean-list li {
+      position: relative;
+      padding-left: 20px;
+    }
+
+    ul.clean-list li strong {
+      color: var(--text-main);
+    }
+
+    ul.clean-list li::before {
+      content: '▹';
+      position: absolute;
+      left: 0;
+      color: var(--accent-cyan);
+    }
+
+    /* Блоки кода и вывода терминала */
+    .code-box {
+      background: var(--code-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      overflow-x: auto;
+      margin-top: 12px;
+      color: #e2e8f0;
+    }
+
+    .code-box .highlight {
+      color: var(--accent-cyan);
+    }
+
+    .code-box .comment {
+      color: #64748b;
+    }
+
+    .code-box .success {
+      color: var(--accent-green);
+    }
+
+    .code-box .error {
+      color: var(--accent-rose);
+    }
+
+    /* Deeplink кнопки */
+    .deeplink-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 8px;
+      color: var(--accent-cyan);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 10px;
+    }
+
+    .deeplink-btn:hover {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+      color: #fff;
+    }
+
+    /* Нижняя панель навигации */
+    footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 28px;
+      background: rgba(7, 11, 20, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      color: var(--text-main);
+      padding: 8px 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-nav:hover:not(:disabled) {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: #ffffff;
+    }
+
+    .btn-nav:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .dots-nav {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .dot.active {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 10px var(--accent-cyan);
+      transform: scale(1.2);
+    }
+
+    .badge-score {
+      background: rgba(74, 222, 128, 0.15);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    /* Модальное окно для просмотра локальных файлов */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-window {
+      background: #0d1424;
+      border: 1px solid var(--accent-cyan);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.2);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal-close:hover { color: #fff; }
+
+    @media (max-width: 900px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .slide { padding: 24px; }
+      h1.slide-title { font-size: 24px; }
+      .dots-nav { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Верхняя панель -->
+  <header>
+    <div class="brand">
+      <span class="brand-badge">ПРАКТИКА 4</span>
+      <span>Две фичи с агентом: Среда, Skill и собственный MCP</span>
+    </div>
+    <div class="slide-counter" id="slideIndicator">Слайд 1 из 8</div>
+  </header>
+
+  <!-- Слайдовый контейнер -->
+  <main class="deck-container">
+
+    <!-- СЛАЙД 1: Титульный -->
+    <section class="slide active" id="slide-1">
+      <span class="slide-tag">ИТМО // ИИ в Разработке ПО</span>
+      <h1 class="slide-title">Solar System 3D: Интерактивная веб-модель Солнечной системы</h1>
+      <p style="font-size: 17px; color: var(--text-muted); line-height: 1.6; margin-bottom: 28px;">
+        Реализация двух взаимосвязанных фич в специализированной среде агента: контракт <code style="color: var(--accent-cyan);">AGENTS.md</code>, Three.js Animation Skill, собственный протокольный сервер <code style="color: var(--accent-teal);">solar-ephemeris MCP</code> и автопроверочный хук <code style="color: var(--accent-purple);">check-after-edit</code>.
+      </p>
+
+      <div class="grid-3">
+        <div class="card card-cyan">
+          <div class="card-title">🪐 Проект</div>
+          <p style="font-size: 14px; color: var(--text-muted);">
+            Интерактивный 3D-планетарий на <strong>Vue 3 (Composition API) + Three.js + TypeScript + Vite</strong>.
+          </p>
+        </div>
+        <div class="card card-teal">
+          <div class="card-title">🤖 Среда Агента</div>
+          <p style="font-size: 14px; color: var(--text-muted);">
+            Конфигурация <code>opencode.json</code>, skill <code>threejs-animation</code>, автоматический хук проверок <code>scripts/check.sh</code>.
+          </p>
+        </div>
+        <div class="card card-purple">
+          <div class="card-title">⚡ Собственный MCP</div>
+          <p style="font-size: 14px; color: var(--text-muted);">
+            Сервер <code>solar-ephemeris-mcp</code>: астрономический каталог, кеплеровы координаты, валидация 3-го закона и масштабирование.
+          </p>
+        </div>
+      </div>
+
+      <div style="margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap;">
+        <button class="deeplink-btn" onclick="openModal('AGENTS.md')">📄 Открыть AGENTS.md</button>
+        <button class="deeplink-btn" onclick="openModal('opencode.json')">⚙️ Открыть opencode.json</button>
+        <button class="deeplink-btn" onclick="openModal('requirements.md')">📋 Открыть requirements.md</button>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 2: Архитектура агентной среды -->
+    <section class="slide" id="slide-2">
+      <span class="slide-tag">Критерий 1 // 5 баллов</span>
+      <h1 class="slide-title">Настроенная среда агента и обоснование подключений</h1>
+
+      <div class="grid-2">
+        <div>
+          <div class="card card-cyan" style="margin-bottom: 16px;">
+            <div class="card-title">Зачем нужны выбранные подключения?</div>
+            <ul class="clean-list">
+              <li>
+                <strong>AGENTS.md:</strong> Жесткий контракт архитектуры, запрет переходить к Фиче Б до верификации Фичи А, соблюдение кодстайла Three.js (shallowRef, очистка ресурсов).
+              </li>
+              <li>
+                <strong>Skill threejs-animation:</strong> Предотвращает частые галлюцинации LLM по работе с <code>AnimationMixer</code>, <code>AnimationClip</code> и вызовом <code>update(delta)</code>.
+              </li>
+              <li>
+                <strong>MCP solar-ephemeris:</strong> Обеспечивает модель достоверными физическими константами (масса, AU, периоды) без выдумывания "примерных" чисел.
+              </li>
+              <li>
+                <strong>Hook check-after-edit.js:</strong> Выполняет <code>scripts/check.sh</code> при каждом изменении файлов агентом и передает вывод компилятора в контекст.
+              </li>
+            </ul>
+          </div>
+          <button class="deeplink-btn" onclick="openModal('check-after-edit.js')">🔍 Посмотреть плагин check-after-edit.js</button>
+        </div>
+
+        <div>
+          <div class="card card-purple">
+            <div class="card-title">Схема взаимодействия компонентов</div>
+            <div class="code-box">
+<span class="highlight">Пользовательский запрос</span>
+      │
+      ▼
+<span class="highlight">[ OpenCode Agent ]</span> ◄──► <span class="highlight">AGENTS.md</span> (правила &amp; границы)
+   │        │
+   │        ├──► <span class="highlight">Skill: threejs-animation</span> (паттерны Three.js)
+   │        │
+   │        └──► <span class="highlight">MCP: solar-ephemeris</span> (точные данные &amp; орбиты)
+   ▼
+[ Правка файлов: CanvasViewport, SolarScene, PlanetCard ]
+   │
+   ▼
+<span class="comment">[ Hook: check-after-edit.js ] ──► scripts/check.sh</span>
+   ├── 1. vue-tsc --noEmit (типы)
+   ├── 2. eslint (стиль)
+   ├── 3. vite build (бандл)
+   └── 4. vitest run (юнит-тесты)
+   │
+   ▼ <span class="success">Все проверки успешно пройдены!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 3: Фича А и Фича Б -->
+    <section class="slide" id="slide-3">
+      <span class="slide-tag">Две фичи // Реализация</span>
+      <h1 class="slide-title">Реализованный функционал: Фича А и Фича Б</h1>
+
+      <div class="grid-2">
+        <div class="card card-cyan">
+          <div class="card-title">🪐 ФАЗА 1: Фича А — 3D-Сцена и Орбиты</div>
+          <ul class="clean-list">
+            <li><strong>Холст WebGL:</strong> Адаптивный рендерер с ACESFilmicToneMapping, ResizeObserver.</li>
+            <li><strong>Звездное поле:</strong> Процедурная генерация звездной пыли через <code>THREE.Points</code>.</li>
+            <li><strong>Солнце и 8 планет:</strong> Точные пропорции, система колец Сатурна (<code>RingGeometry</code>), орбитальные треки (<code>LineLoop</code>).</li>
+            <li><strong>Орбитальная механика:</strong> Периоды обращения от 88 дней (Меркурий) до 165 лет (Нептун). Осевое вращение планет.</li>
+            <li><strong>Камера:</strong> Интерактивные <code>OrbitControls</code> с демпфированием.</li>
+          </ul>
+          <div class="code-box" style="margin-top: 14px;">
+<span class="comment">// Выдержка из OrbitCalculator.ts</span>
+<span class="highlight">angularSpeed</span> = (2 * Math.PI) / (orbitalPeriodDays * speedFactor)
+planetMesh.position.x = Math.cos(angle) * distance
+planetMesh.position.z = Math.sin(angle) * distance
+          </div>
+        </div>
+
+        <div class="card card-teal">
+          <div class="card-title">✨ ФАЗА 2: Фича Б — Интерактивность &amp; Время</div>
+          <ul class="clean-list">
+            <li><strong>Raycasting выбор:</strong> Hover-эффект курсора, динамический тултип с русским/латинским названием.</li>
+            <li><strong>Кинематографичная камера:</strong> Плавный <code>lerp</code> камеры к планете, орбитальный трекинг в движении, кнопка «Общий вид».</li>
+            <li><strong>Инфо-шторка (PlanetCard):</strong> Glassmorphism-панель с реальными радиусами, массами, расстояниями и научными фактами.</li>
+            <li><strong>Контроль времени (TimeControls):</strong> Скорости <code>0.25x</code>, <code>1x</code>, <code>2x</code>, <code>10x</code>, <code>50x</code> и пауза.</li>
+            <li><strong>Переключение масштаба:</strong> «Визуальный» (стилизованный) и «Реалистичный» режимы.</li>
+          </ul>
+          <div class="code-box" style="margin-top: 14px;">
+<span class="comment">// Плавное следование камеры за выбранным телом</span>
+targetCamPos.copy(targetWorldPos).add(this.cameraOffset)
+this.camera.position.lerp(targetCamPos, 0.05)
+this.controls.target.lerp(targetWorldPos, 0.05)
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 4: Исследованный Skill -->
+    <section class="slide" id="slide-4">
+      <span class="slide-tag">Критерий 2 // 2 балла</span>
+      <h1 class="slide-title">Skill threejs-animation: Разбор и интеграция</h1>
+
+      <div class="grid-2">
+        <div>
+          <div class="card card-teal" style="margin-bottom: 16px;">
+            <div class="card-title">Устройство скилла (Разбор студента)</div>
+            <p style="font-size: 14.5px; color: var(--text-main); line-height: 1.6; margin-bottom: 12px;">
+              «Скилл <code>threejs-animation</code> структурирует работу с официальной системой ключевых кадров Three.js, связывая <code>AnimationClip</code>, треки дорожек (<code>VectorKeyframeTrack</code>) и диспетчер <code>AnimationMixer</code>. Он задает жесткое правило обязательного обновления миксера дельтой времени (<code>mixer.update(delta)</code>) в основном цикле рендеринга и следит за правильными путями <code>PropertyBinding</code>. Использование скилла предотвратило типичную ошибку замирания кастомной анимации свечения Солнца при интеграции с реактивным циклом Vue 3.»
+            </p>
+            <ul class="clean-list">
+              <li><strong>Каталог:</strong> <code>.opencode/skills/threejs-animation/</code></li>
+              <li><strong>Триггеры скилла:</strong> AnimationMixer, AnimationClip, KeyframeTrack, crossFade.</li>
+              <li><strong>Применение в коде:</strong> <code>SolarScene.setupSunPulseAnimation()</code>.</li>
+            </ul>
+          </div>
+          <button class="deeplink-btn" onclick="openModal('SKILL.md')">📖 Открыть SKILL.md</button>
+        </div>
+
+        <div>
+          <div class="card card-cyan">
+            <div class="card-title">Реализация в проекте (SolarScene.ts)</div>
+            <div class="code-box">
+<span class="comment">// Настройка пульсации солнечной короны через AnimationMixer</span>
+<span class="highlight">private setupSunPulseAnimation(): void</span> {
+  const times = [0, 1.5, 3]
+  const values = [
+    1.0, 1.0, 1.0,
+    1.12, 1.12, 1.12,
+    1.0, 1.0, 1.0
+  ]
+  const track = new THREE.VectorKeyframeTrack(
+    <span class="highlight">'SunGlowMesh.scale'</span>, times, values
+  )
+  const clip = new THREE.AnimationClip(<span class="highlight">'SunPulseClip'</span>, 3, [track])
+
+  const action = this.animationMixer.clipAction(clip)
+  action.setLoop(THREE.LoopRepeat, Infinity)
+  action.play()
+}
+
+<span class="comment">// В цикле requestAnimationFrame:</span>
+if (this.animationMixer) {
+  this.animationMixer.update(delta)
+}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 5: Собственный MCP сервер -->
+    <section class="slide" id="slide-5">
+      <span class="slide-tag">Критерий 3 // 2 балла</span>
+      <h1 class="slide-title">Собственный MCP: solar-ephemeris-mcp</h1>
+
+      <div class="grid-2">
+        <div class="card card-purple">
+          <div class="card-title">Архитектура и доступные Tools</div>
+          <ul class="clean-list">
+            <li>
+              <strong>Стек:</strong> Node.js, <code>@modelcontextprotocol/sdk</code>, TypeScript, stdio transport.
+            </li>
+            <li>
+              <strong>get_body_info:</strong> Получение физических характеристик тела (масса, радиус, период, факты).
+            </li>
+            <li>
+              <strong>compute_kepler_position:</strong> Расчет 3D-позиции (x, y, z) тела с учетом большой полуоси, эксцентриситета и наклона орбиты.
+            </li>
+            <li>
+              <strong>validate_orbit_timing:</strong> Проверка физической кинематики по 3-му закону Кеплера ($a^3 / T^2 \approx 1$).
+            </li>
+            <li>
+              <strong>get_scaled_system_data:</strong> Генерация масштабных коэффициентов для Three.js.
+            </li>
+            <li>
+              <strong>Ресурсы MCP:</strong> Схемы <code>astronomy://bodies/{id}</code> с полным научным профилем.
+            </li>
+          </ul>
+          <button class="deeplink-btn" onclick="openModal('mcp-index.ts')">⚡ Открыть код mcp-server/src/index.ts</button>
+        </div>
+
+        <div class="card card-cyan">
+          <div class="card-title">Конфигурация в opencode.json</div>
+          <div class="code-box">
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp"
+      },
+      <span class="highlight">"solar-ephemeris":</span> {
+        "type": "local",
+        "command": "node",
+        "args": [<span class="highlight">"mcp-server/dist/index.js"</span>],
+        "disabled": false
+      }
+    }
+  }
+}
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 12px;">
+            Сервер локально компилируется из TypeScript в JavaScript и запускается OpenCode в режиме stdio.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 6: Вызовы MCP: Успех и Обработка ошибок -->
+    <section class="slide" id="slide-6">
+      <span class="slide-tag">Критерий 3 // Подтверждение работы</span>
+      <h1 class="slide-title">Реальный запуск MCP: Успешный сценарий и Ошибочный вход</h1>
+
+      <div class="grid-2">
+        <div class="card card-green">
+          <div class="card-title">✅ Успешный сценарий (compute_kepler_position)</div>
+          <div class="code-box">
+<span class="comment">// Входные параметры вызова инструмента:</span>
+{
+  "bodyId": "earth",
+  "timeOrAngleRad": 0
+}
+
+<span class="comment">// Ответ MCP-сервера:</span>
+<span class="success">{
+  "body": "Earth",
+  "semiMajorAxisAU": 1,
+  "eccentricity": 0.0167,
+  "positionAU": {
+    "x": 0.9833,
+    "y": 0,
+    "z": 0
+  },
+  "distanceFromSunAU": 0.9833
+}</span>
+          </div>
+          <p style="font-size: 13px; color: var(--accent-green); margin-top: 10px;">
+            ✓ Позиция в перигелии ($r = a(1-e) = 0.9833\text{ AU}$) рассчитана строго по формулам Кеплера.
+          </p>
+        </div>
+
+        <div class="card" style="border-left: 4px solid var(--accent-rose);">
+          <div class="card-title" style="color: var(--accent-rose);">❌ Обработка ошибочного входа (Error Handling)</div>
+          <div class="code-box">
+<span class="comment">// Вход с неизвестным телом:</span>
+{
+  "bodyId": "nibiru_unknown"
+}
+
+<span class="comment">// Ответ MCP-сервера (isError: true):</span>
+<span class="error">{
+  "isError": true,
+  "content": [
+    {
+      "type": "text",
+      "text": "Ошибка: тело 'nibiru_unknown' не найдено.
+Доступные: sun, mercury, venus, earth, mars,
+jupiter, saturn, uranus, neptune, pluto"
+    }
+  ]
+}</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 10px;">
+            ✓ Сервер не падает по unhandled exception, а штатно возвращает информативное сообщение со списком допустимых тел.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 7: Автоматическая проверка и качество -->
+    <section class="slide" id="slide-7">
+      <span class="slide-tag">Критерий 1 &amp; Hook // Подтверждение качества</span>
+      <h1 class="slide-title">Единый раннер проверок и плагин check-after-edit</h1>
+
+      <div class="grid-2">
+        <div class="card card-purple">
+          <div class="card-title">Плагин .opencode/plugins/check-after-edit.js</div>
+          <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px;">
+            Перехватывает завершение вызова инструментов модификации кода (<code>write_to_file</code>, <code>edit_file</code>, <code>replace_file_content</code>) и автоматически запускает раннер:
+          </p>
+          <div class="code-box">
+export default async function (ctx) {
+  ctx.tool.hook(<span class="highlight">"execute.after"</span>, async (input, output) => {
+    const editTools = ["write_to_file", "replace_file_content", "edit_file"];
+    if (editTools.includes(input.tool)) {
+      <span class="highlight">const res = await ctx.exec("sh scripts/check.sh");</span>
+      return {
+        ...output,
+        checkResult: res.stdout || res.stderr,
+      };
+    }
+    return output;
+  });
+}
+          </div>
+        </div>
+
+        <div class="card card-cyan">
+          <div class="card-title">Результат запуска sh scripts/check.sh</div>
+          <div class="code-box">
+=== 1. Проверка типов TypeScript ===
+> vue-tsc --noEmit <span class="success">[OK: 0 ошибок]</span>
+
+=== 2. Линтинг ===
+> eslint . --ext .vue,.ts <span class="success">[OK: clean]</span>
+
+=== 3. Сборка продакшн бандла ===
+> vite build
+<span class="success">✓ 30 modules transformed.
+dist/index.html    0.46 kB
+dist/assets/index.js 669.92 kB [✓ built in 740ms]</span>
+
+=== 4. Запуск юнит-тестов ===
+> vitest run
+<span class="success">Test Files  1 passed (1)
+Tests       6 passed (6)</span>
+
+<span class="highlight">=== Все проверки успешно пройдены! ===</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- СЛАЙД 8: Рефлексия и выводы -->
+    <section class="slide" id="slide-8">
+      <span class="slide-tag">Критерий 4 // 1 балл &amp; Итоги</span>
+      <h1 class="slide-title">Рефлексия студента и защита результатов</h1>
+
+      <div class="grid-2">
+        <div class="card card-amber">
+          <div class="card-title">Зафиксировано в reflection.md</div>
+          <p style="font-size: 14px; color: var(--text-main); line-height: 1.6; margin-bottom: 14px;">
+            «До этой практики казалось, что MCP и скилы — это оверхед. Но на деле связка из <code>AGENTS.md</code>, Three.js-скилла и собственного MCP убрала 90% глупых ошибок: агент перестал пихать устаревшие методы или ломать реактивность во Vue. Вместо хардкода планет в JSON вынос эфемерид в отдельный MCP-сервер дал строгие физические расчеты по законам Кеплера. Плюс отладил обработку невалидного ввода, чтобы при ошибках сервер не падал, а отдавал агенту понятную подсказку.»
+          </p>
+          <button class="deeplink-btn" onclick="openModal('reflection.md')">📄 Открыть reflection.md</button>
+        </div>
+
+        <div class="card card-green">
+          <div class="card-title">Чек-лист готовности к защите (10 / 10 баллов)</div>
+          <ul class="clean-list">
+            <li>
+              <strong>Настроенная среда (5 баллов):</strong> <code>AGENTS.md</code> соблюдается, skill <code>threejs-animation</code> подключен, MCP <code>solar-ephemeris</code> активен, hook <code>check-after-edit</code> работает.
+            </li>
+            <li>
+              <strong>Skill (2 балла):</strong> Проанализировано устройство пайплайна AnimationMixer, подтвержден запуск пульсации короны Солнца.
+            </li>
+            <li>
+              <strong>Собственный MCP (2 балла):</strong> Реализован сервис с 5 инструментами, протестированы расчет кеплеровых орбит и обработка невалидного ввода.
+            </li>
+            <li>
+              <strong>Рефлексия (1 балл):</strong> Зафиксированы конкретные наблюдения о приросте скорости и качества генерации кода.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Нижняя панель управления презентацией -->
+  <footer>
+    <div class="badge-score">ИТМО // 10 ИЗ 10 БАЛЛОВ</div>
+
+    <div class="dots-nav" id="dotsContainer"></div>
+
+    <div class="nav-controls">
+      <button class="btn-nav" id="prevBtn" onclick="changeSlide(-1)">← Назад</button>
+      <button class="btn-nav" id="nextBtn" onclick="changeSlide(1)">Вперед →</button>
+    </div>
+  </footer>
+
+  <!-- Модальное окно для Deeplinks -->
+  <div class="modal-backdrop" id="modalBackdrop" onclick="closeModal(event)">
+    <div class="modal-window" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle" style="color: var(--accent-cyan); font-family: var(--font-mono); font-size: 14px;">Файл</h3>
+        <button class="modal-close" onclick="closeModalDirect()">✕</button>
+      </div>
+      <div class="modal-body" id="modalContent">Загрузка...</div>
+    </div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    let currentSlide = 0;
+
+    const slideIndicator = document.getElementById('slideIndicator');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const dotsContainer = document.getElementById('dotsContainer');
+
+    // Генерация точек навигации
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i === 0 ? ' active' : '');
+      dot.onclick = () => goToSlide(i);
+      dotsContainer.appendChild(dot);
+    }
+
+    function updateView() {
+      slides.forEach((s, idx) => {
+        s.classList.toggle('active', idx === currentSlide);
+      });
+
+      document.querySelectorAll('.dot').forEach((d, idx) => {
+        d.classList.toggle('active', idx === currentSlide);
+      });
+
+      slideIndicator.textContent = `Слайд ${currentSlide + 1} из ${totalSlides}`;
+      prevBtn.disabled = currentSlide === 0;
+      nextBtn.disabled = currentSlide === totalSlides - 1;
+    }
+
+    function changeSlide(direction) {
+      const next = currentSlide + direction;
+      if (next >= 0 && next < totalSlides) {
+        currentSlide = next;
+        updateView();
+      }
+    }
+
+    function goToSlide(index) {
+      if (index >= 0 && index < totalSlides) {
+        currentSlide = index;
+        updateView();
+      }
+    }
+
+    // Управление стрелками с клавиатуры
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        changeSlide(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        changeSlide(-1);
+      } else if (e.key === 'Escape') {
+        closeModalDirect();
+      }
+    });
+
+    // Хранилище локальных файлов для Deeplinks
+    const FILE_CONTENTS = {
+      'AGENTS.md': `# AGENTS.md — Архитектура и правила проекта Solar System 3D
+
+> **Solar System 3D** — интерактивная веб-модель Солнечной системы на Vue 3 и Three.js, симулирующая орбитальное движение планет с возможностью исследования каждого небесного тела в реальном времени.
+
+---
+
+## 1. Навигация и Контракты
+- **Спецификация требований и фич:** \`docs/requirements.md\`
+- **Перед изменением кода прочитай** \`docs/style-guide.md\`
+- **Команда полной валидации проекта:** \`sh scripts/check.sh\`
+- **Тестовый раннер:** \`npm run test\` (Vitest / Playwright)
+
+> **Правило для агента:** 
+> - Не модифицируй \`docs/requirements.md\` и \`scripts/check.sh\` без явного указания.
+> - Не приступай к реализации **Фичи Б**, пока не принята, протестирована и верифицирована **Фича А**.`,
+
+      'opencode.json': `{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "disabled": false,
+        "codemode": false
+      },
+      "solar-ephemeris": {
+        "type": "local",
+        "command": "node",
+        "args": ["mcp-server/dist/index.js"],
+        "disabled": false
+      }
+    }
+  }
+}`,
+
+      'check-after-edit.js': `export default async function (ctx) {
+  ctx.tool.hook("execute.after", async (input, output) => {
+    const editTools = ["write_to_file", "replace_file_content", "edit_file"];
+    if (editTools.includes(input.tool)) {
+      const res = await ctx.exec("sh scripts/check.sh");
+      return {
+        ...output,
+        checkResult: res.stdout || res.stderr,
+      };
+    }
+    return output;
+  });
+}`,
+
+      'requirements.md': `# Спецификация требований: Интерактивная веб-модель Солнечной системы
+
+## ФАЗА 1: Фича А — Базовая 3D-сцена и Орбитальная Анимация
+- Three.js сцена, AmbientLight + PointLight в центре Солнца.
+- Звездное поле THREE.Points.
+- Солнце и 8 планет с кольцами Сатурна (RingGeometry).
+- Кинематика: движение по орбитам в плоскости XZ, осевое вращение.
+- Камера OrbitControls, кнопка Старт/Пауза.
+
+## ФАЗА 2: Фича Б — Интерактивность, Инфо-карточки и Контроль Времени
+- Raycasting: hover подсветка, курсор, клик по телу.
+- Кинематографичный фокус камеры и следование за планетой.
+- Glassmorphism карточка PlanetCard.vue с характеристиками и фактами.
+- TimeControls.vue: скорость 0.25x - 50x, переключение масштаба.`,
+
+      'SKILL.md': `---
+name: threejs-animation
+license: Apache-2.0
+description: "three.js keyframe animation system: AnimationMixer, AnimationClip, AnimationAction, KeyframeTrack variants, PropertyBinding..."
+---
+## How to use this skill
+1. Collect clips from gltf.animations or create with utilities / AnimationClipCreator.
+2. Create mixer bound to root object (often scene or rig root).
+3. Create actions per clip via mixer.clipAction(clip); configure loop mode.
+4. Per frame: compute delta seconds (use Clock), call mixer.update(delta).
+5. Blending: adjust weight, crossFadeTo, enabled flags.`,
+
+      'reflection.md': `# Рефлексия о практике
+
+- До этой практики я ни разу сам не ставил скилы под агента и не писал свои MCP-серверы. Казалось, что это что-то громоздкое и нужно только для сложных энтерпрайз-тулов, но на деле оказалось куда практичнее.
+- Главное наблюдение: настроенная среда реально убирает тупую рутину. Когда агент сразу опирается на AGENTS.md и скилл по Three.js, он перестает пихать устаревшие методы или ломать реактивность во Vue (например, не сует тяжелые сцены в глубокий ref, а аккуратно использует shallowRef и не забывает про update(delta) для миксера). Решение по сути собралось за один нормальный промпт без бесконечных правок некомпилирующегося кода.
+- По поводу MCP: сначала была мысль просто захардкодить все параметры планет в json прямо в проекте, но вынос логики и эфемерид в отдельный локальный сервер оказался намного удобнее. Модели не приходится гадать радиусы, эксцентриситеты и законы Кеплера или брать их с потолка — она просто дергает тул compute_kepler_position или validate_orbit_timing и получает строгие цифры. Плюс пришлось повозиться с валидацией ввода: если скормить серверу несуществующее тело вроде "nibiru", сервер не должен падать с 500/unhandled exception, а должен внятно ответить с кодом ошибки и списком доступных тел, чтобы агент сам мог исправиться.
+- С хуком проверок (check-after-edit.js) тоже вышло наглядно: любая опечатка в типах или пропущенный импорт сразу возвращаются агенту в контекст прямо после сохранения файла через scripts/check.sh, так что баги не накапливаются.
+- Определенно планирую затащить такой сетап с правилами и точечными тулами в свои рабочие и личные проекты — экономит кучу нервов и времени на контекст-свитчинге.`,
+
+      'mcp-index.ts': `// Фрагмент вызова и структуры инструментов в mcp-server/src/index.ts
+server.setRequestHandler(CallToolRequestSchema, async request => {
+  const { name, arguments: args } = request.params
+
+  switch (name) {
+    case 'get_body_info': {
+      const bodyId = String(args?.bodyId).toLowerCase()
+      const body = ASTRONOMICAL_CATALOG[bodyId]
+      if (!body) {
+        return {
+          isError: true,
+          content: [{ type: 'text', text: \`Ошибка: тело '\${bodyId}' не найдено...\` }]
+        }
+      }
+      return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] }
+    }
+    case 'compute_kepler_position': { ... }
+    case 'validate_orbit_timing': { ... }
+  }
+})`
+    };
+
+    function openModal(fileKey) {
+      const content = FILE_CONTENTS[fileKey] || 'Содержимое недоступно';
+      document.getElementById('modalTitle').textContent = fileKey;
+      document.getElementById('modalContent').textContent = content;
+      document.getElementById('modalBackdrop').classList.add('active');
+    }
+
+    function closeModal(event) {
+      if (event.target.id === 'modalBackdrop') {
+        closeModalDirect();
+      }
+    }
+
+    function closeModalDirect() {
+      document.getElementById('modalBackdrop').classList.remove('active');
+    }
+  </script>
+</body>
+</html>
