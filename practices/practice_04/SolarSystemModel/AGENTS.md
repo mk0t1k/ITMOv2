@@ -6,6 +6,7 @@
 
 ## 1. Навигация и Контракты
 - **Спецификация требований и фич:** `docs/requirements.md`
+- **Перед изменением кода прочитай** `docs/style-guide.md`
 - **Команда полной валидации проекта:** `sh scripts/check.sh`
 - **Тестовый раннер:** `npm run test` (Vitest / Playwright)
 
