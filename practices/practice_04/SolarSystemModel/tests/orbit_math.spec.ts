@@ -44,4 +44,49 @@ describe('OrbitCalculator', () => {
     const wrappedAngle = calculator.updateAngle(Math.PI * 2 - 0.1, speed, 0.2)
     expect(wrappedAngle).toBeCloseTo(0.1)
   })
+
+  it('должен масштабировать шаг угла пропорционально timeScale без рывков', () => {
+    const startAngle = 0
+    const speed = 1.0
+    const delta = 0.1
+
+    const angle1x = calculator.updateAngle(startAngle, speed, delta, 1.0)
+    const angle2x = calculator.updateAngle(startAngle, speed, delta, 2.0)
+    const angle10x = calculator.updateAngle(startAngle, speed, delta, 10.0)
+
+    expect(angle1x).toBeCloseTo(0.1)
+    expect(angle2x).toBeCloseTo(0.2)
+    expect(angle10x).toBeCloseTo(1.0)
+  })
+
+  it('должен корректно вычислять масштаб радиуса для визуального и реалистичного режимов', () => {
+    const earthRadius = 6371.0
+    const jupiterRadius = 69911.0
+
+    // Визуальный режим: всегда 1.0
+    expect(calculator.calculateRadiusScale(earthRadius, earthRadius, false)).toBe(1.0)
+    expect(calculator.calculateRadiusScale(jupiterRadius, earthRadius, false)).toBe(1.0)
+
+    // Реалистичный режим
+    const earthScale = calculator.calculateRadiusScale(earthRadius, earthRadius, true)
+    const jupiterScale = calculator.calculateRadiusScale(jupiterRadius, earthRadius, true)
+
+    expect(earthScale).toBeCloseTo(1.0)
+    expect(jupiterScale).toBeGreaterThan(earthScale)
+    expect(jupiterScale).toBeCloseTo(jupiterRadius / earthRadius)
+  })
+
+  it('все небесные тела должны содержать корректные метаданные для инфо-карточки (Фича Б)', () => {
+    expect(PLANETS_DATA).toHaveLength(8)
+    for (const planet of PLANETS_DATA) {
+      expect(planet.id).toBeDefined()
+      expect(planet.name).toBeDefined()
+      expect(planet.russianName).toBeDefined()
+      expect(planet.typeName).toBeDefined()
+      expect(planet.realRadiusKm).toBeGreaterThan(0)
+      expect(planet.realDistanceMillionKm).toBeGreaterThan(0)
+      expect(planet.massKg).toBeDefined()
+      expect(planet.interestingFacts.length).toBeGreaterThanOrEqual(1)
+    }
+  })
 })

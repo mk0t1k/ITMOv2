@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { SUN_DATA, PLANETS_DATA, type CelestialBodyData } from '../data/celestialBodies'
 import { OrbitCalculator } from './OrbitCalculator'
+import { RaycasterManager, type HoverEventPayload } from './RaycasterManager'
 
 export interface PlanetMeshObject {
   data: CelestialBodyData
@@ -9,14 +10,16 @@ export interface PlanetMeshObject {
   pivot: THREE.Group
   angle: number
   angularSpeed: number
+  initialRadius: number
 }
+
+export type ViewMode = 'visual' | 'realistic'
 
 /**
  * SolarScene
  * Управляет Three.js сценой, WebGLRenderer, камерой, OrbitControls,
- * созданием планет, анимацией с AnimationMixer / Clock, и циклом рендеринга.
- * Официальная документация Three.js Animation: https://threejs.org/docs/#Animation
- * AnimationMixer: https://threejs.org/docs/AnimationMixer.html
+ * созданием планет, кинематографичным перемещением камеры к выбранному телу,
+ * Raycasting-интерактивностью и контролем времени.
  */
 export class SolarScene {
   private container: HTMLElement
@@ -31,10 +34,26 @@ export class SolarScene {
   private sunGlowMesh!: THREE.Mesh
   private planets: PlanetMeshObject[] = []
   private orbitCalculator: OrbitCalculator
+  private raycasterManager: RaycasterManager
 
   private isRunning: boolean = true
+  private timeSpeed: number = 1.0
+  private viewMode: ViewMode = 'visual'
+
+  // Фокусировка камеры
+  private selectedBody: CelestialBodyData | null = null
+  private defaultCameraPos = new THREE.Vector3(0, 75, 130)
+  private defaultControlsTarget = new THREE.Vector3(0, 0, 0)
+  private cameraOffset = new THREE.Vector3(0, 4, 10)
+  private isTransitioning: boolean = false
+  private transitionAlpha: number = 0
+
   private animationFrameId: number | null = null
   private resizeObserver: ResizeObserver | null = null
+
+  // Коллбэки для интеграции с Vue
+  private onHoverCallback?: (payload: HoverEventPayload) => void
+  private onSelectCallback?: (body: CelestialBodyData | null) => void
 
   constructor(container: HTMLElement) {
     this.container = container
@@ -45,7 +64,7 @@ export class SolarScene {
     // 1. Камера
     const aspect = container.clientWidth / (container.clientHeight || 1)
     this.camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 2000)
-    this.camera.position.set(0, 75, 130)
+    this.camera.position.copy(this.defaultCameraPos)
 
     // 2. Рендерер
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -59,9 +78,9 @@ export class SolarScene {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.05
-    this.controls.minDistance = 10
+    this.controls.minDistance = 3
     this.controls.maxDistance = 500
-    this.controls.target.set(0, 0, 0)
+    this.controls.target.copy(this.defaultControlsTarget)
 
     // 4. AnimationMixer привязан к корневой сцене
     this.animationMixer = new THREE.AnimationMixer(this.scene)
@@ -71,6 +90,18 @@ export class SolarScene {
     this.initSun()
     this.initPlanets()
     this.setupSunPulseAnimation()
+
+    // 5. Raycaster
+    this.raycasterManager = new RaycasterManager(
+      this.renderer.domElement,
+      this.camera,
+      () => this.planets,
+      () => ({ mesh: this.sunMesh, data: SUN_DATA })
+    )
+    this.raycasterManager.setCallbacks(
+      payload => this.onHoverCallback && this.onHoverCallback(payload),
+      body => this.selectBody(body)
+    )
 
     this.onWindowResize = this.onWindowResize.bind(this)
     this.animate = this.animate.bind(this)
@@ -83,11 +114,9 @@ export class SolarScene {
   }
 
   private initLighting(): void {
-    // Мягкий рассеянный свет
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.18)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.22)
     this.scene.add(ambientLight)
 
-    // Точечный источник света из центра Солнца
     const pointLight = new THREE.PointLight(0xfff5e6, 3.5, 800, 0.5)
     pointLight.position.set(0, 0, 0)
     this.scene.add(pointLight)
@@ -141,7 +170,6 @@ export class SolarScene {
     this.sunMesh.name = 'SunMesh'
     this.scene.add(this.sunMesh)
 
-    // Внешнее свечение вокруг Солнца
     const glowGeo = new THREE.SphereGeometry(SUN_DATA.radius * 1.25, 32, 32)
     const glowMat = new THREE.MeshBasicMaterial({
       color: SUN_DATA.emissive || 0xff7700,
@@ -156,7 +184,6 @@ export class SolarScene {
 
   private initPlanets(): void {
     PLANETS_DATA.forEach((planetData, index) => {
-      // 1. Орбитальная круговая траектория (LineLoop в плоскости XZ)
       const orbitCurve = new THREE.EllipseCurve(
         0, 0,
         planetData.distance, planetData.distance,
@@ -165,7 +192,6 @@ export class SolarScene {
         0
       )
       const points = orbitCurve.getPoints(96)
-      // Преобразуем точки в плоскость XZ
       const orbitGeo = new THREE.BufferGeometry().setFromPoints(
         points.map(p => new THREE.Vector3(p.x, 0, p.y))
       )
@@ -177,7 +203,6 @@ export class SolarScene {
       const orbitLine = new THREE.LineLoop(orbitGeo, orbitMat)
       this.scene.add(orbitLine)
 
-      // 2. Меш планеты
       const planetGeo = new THREE.SphereGeometry(planetData.radius, 32, 32)
       const planetMat = new THREE.MeshStandardMaterial({
         color: planetData.color,
@@ -188,14 +213,12 @@ export class SolarScene {
       planetMesh.castShadow = true
       planetMesh.receiveShadow = true
 
-      // 3. Кольца (например, Сатурн)
       if (planetData.ring) {
         const ringGeo = new THREE.RingGeometry(
           planetData.ring.innerRadius,
           planetData.ring.outerRadius,
           64
         )
-        // Разворачиваем кольцо горизонтально
         ringGeo.rotateX(Math.PI / 2)
         const ringMat = new THREE.MeshStandardMaterial({
           color: planetData.ring.color,
@@ -205,16 +228,14 @@ export class SolarScene {
           roughness: 0.6
         })
         const ringMesh = new THREE.Mesh(ringGeo, ringMat)
-        ringMesh.rotation.x = 0.35 // Наклон колец
+        ringMesh.rotation.x = 0.35
         planetMesh.add(ringMesh)
       }
 
-      // Создаем пивот / группу планеты
       const pivot = new THREE.Group()
       pivot.add(planetMesh)
       this.scene.add(pivot)
 
-      // Начальный сдвиг по фазе, чтобы планеты не выстраивались в одну линию
       const initialAngle = (index * (Math.PI * 2)) / PLANETS_DATA.length
       const pos = this.orbitCalculator.calculatePosition(planetData.distance, initialAngle)
       planetMesh.position.set(pos.x, pos.y, pos.z)
@@ -226,18 +247,13 @@ export class SolarScene {
         mesh: planetMesh,
         pivot,
         angle: initialAngle,
-        angularSpeed
+        angularSpeed,
+        initialRadius: planetData.radius
       })
     })
   }
 
-  /**
-   * Настройка трековой анимации пульсации свечения Солнца с использованием
-   * three.js AnimationClip и AnimationMixer (согласно skill threejs-animation)
-   * Ссылка: https://threejs.org/docs/AnimationMixer.html
-   */
   private setupSunPulseAnimation(): void {
-    // Векторные ключевые кадры масштаба свечения
     const times = [0, 1.5, 3]
     const values = [
       1.0, 1.0, 1.0,
@@ -252,10 +268,20 @@ export class SolarScene {
     action.play()
   }
 
+  // --- Реактивные слушатели и методы управления (Фича Б) ---
+
+  public setEventCallbacks(
+    onHover: (payload: HoverEventPayload) => void,
+    onSelect: (body: CelestialBodyData | null) => void
+  ): void {
+    this.onHoverCallback = onHover
+    this.onSelectCallback = onSelect
+  }
+
   public setRunning(running: boolean): void {
     this.isRunning = running
     if (running) {
-      this.clock.getDelta() // сброс накопленной паузы
+      this.clock.getDelta()
     }
   }
 
@@ -266,6 +292,86 @@ export class SolarScene {
   public toggleRunning(): boolean {
     this.setRunning(!this.isRunning)
     return this.isRunning
+  }
+
+  public setTimeSpeed(speed: number): void {
+    this.timeSpeed = Math.max(0.01, speed)
+  }
+
+  public getTimeSpeed(): number {
+    return this.timeSpeed
+  }
+
+  public setViewMode(mode: ViewMode): void {
+    this.viewMode = mode
+    this.applyViewModeScale()
+  }
+
+  public getViewMode(): ViewMode {
+    return this.viewMode
+  }
+
+  private applyViewModeScale(): void {
+    const isRealistic = this.viewMode === 'realistic'
+
+    // Солнце
+    if (this.sunMesh) {
+      const sunScale = isRealistic ? 1.6 : 1.0
+      this.sunMesh.scale.setScalar(sunScale)
+      this.sunGlowMesh.scale.setScalar(sunScale)
+    }
+
+    // Планеты
+    for (const planet of this.planets) {
+      const scale = this.orbitCalculator.calculateRadiusScale(
+        planet.data.realRadiusKm,
+        6371.0,
+        isRealistic
+      )
+      if (isRealistic) {
+        const factor = scale * 0.75
+        planet.mesh.scale.setScalar(Math.max(0.3, factor))
+      } else {
+        planet.mesh.scale.setScalar(1.0)
+      }
+    }
+  }
+
+  public selectBody(body: CelestialBodyData | null): void {
+    this.selectedBody = body
+    this.isTransitioning = true
+    this.transitionAlpha = 0
+
+    if (body) {
+      const targetRadius = body.id === 'sun' ? SUN_DATA.radius * 1.5 : (body.ring ? body.radius * 3.5 : body.radius * 2.5)
+      this.cameraOffset.set(0, targetRadius * 0.8, targetRadius * 2.2)
+    }
+
+    if (this.onSelectCallback) {
+      this.onSelectCallback(body)
+    }
+  }
+
+  public resetView(): void {
+    this.selectBody(null)
+  }
+
+  public getSelectedBody(): CelestialBodyData | null {
+    return this.selectedBody
+  }
+
+  private getSelectedBodyTargetPosition(): THREE.Vector3 {
+    if (!this.selectedBody) {
+      return this.defaultControlsTarget
+    }
+    if (this.selectedBody.id === 'sun') {
+      return this.sunMesh.position
+    }
+    const found = this.planets.find(p => p.data.id === this.selectedBody!.id)
+    if (found) {
+      return found.mesh.position
+    }
+    return this.defaultControlsTarget
   }
 
   private onWindowResize(): void {
@@ -282,29 +388,59 @@ export class SolarScene {
 
     const delta = this.clock.getDelta()
 
-    // AnimationMixer обновляется стабильным источником времени delta (Clock)
-    // https://threejs.org/docs/AnimationMixer.html
     if (this.animationMixer) {
       this.animationMixer.update(delta)
     }
 
     if (this.isRunning) {
+      const effectiveDelta = delta * this.timeSpeed
+
       // Осевое вращение Солнца
-      this.sunMesh.rotation.y += SUN_DATA.rotationSpeed * delta
+      this.sunMesh.rotation.y += SUN_DATA.rotationSpeed * effectiveDelta
 
       // Движение планет
       for (const planet of this.planets) {
-        // Осевое вращение планеты
-        planet.mesh.rotation.y += planet.data.rotationSpeed * delta
+        planet.mesh.rotation.y += planet.data.rotationSpeed * effectiveDelta
 
-        // Орбитальное движение
         planet.angle = this.orbitCalculator.updateAngle(
           planet.angle,
           planet.angularSpeed,
-          delta
+          delta,
+          this.timeSpeed
         )
         const pos = this.orbitCalculator.calculatePosition(planet.data.distance, planet.angle)
         planet.mesh.position.set(pos.x, pos.y, pos.z)
+      }
+    }
+
+    // Обновление положения камеры при фокусе на небесном теле
+    if (this.selectedBody) {
+      const targetPos = this.getSelectedBodyTargetPosition()
+      const desiredCamPos = targetPos.clone().add(this.cameraOffset)
+
+      if (this.isTransitioning) {
+        this.transitionAlpha += delta * 2.0
+        const t = Math.min(1.0, this.transitionAlpha)
+        this.camera.position.lerp(desiredCamPos, t)
+        this.controls.target.lerp(targetPos, t)
+
+        if (t >= 1.0) {
+          this.isTransitioning = false
+        }
+      } else {
+        // Камера привязана к движущейся планете и летит вместе с ней
+        this.camera.position.lerp(desiredCamPos, 0.1)
+        this.controls.target.lerp(targetPos, 0.1)
+      }
+    } else if (this.isTransitioning) {
+      // Плавный сброс вида (Reset View)
+      this.transitionAlpha += delta * 2.0
+      const t = Math.min(1.0, this.transitionAlpha)
+      this.camera.position.lerp(this.defaultCameraPos, t)
+      this.controls.target.lerp(this.defaultControlsTarget, t)
+
+      if (t >= 1.0) {
+        this.isTransitioning = false
       }
     }
 
@@ -320,6 +456,7 @@ export class SolarScene {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect()
     }
+    this.raycasterManager.destroy()
     this.controls.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement && this.renderer.domElement.parentElement) {

@@ -29,7 +29,20 @@ export class OrbitCalculator {
    */
   public updateAngle(currentAngle: number, angularSpeed: number, delta: number, timeScale: number = 1.0): number {
     const nextAngle = currentAngle + angularSpeed * delta * timeScale
-    return nextAngle % (Math.PI * 2)
+    const twoPi = Math.PI * 2
+    return ((nextAngle % twoPi) + twoPi) % twoPi
+  }
+
+  /**
+   * Вычисляет масштаб радиуса в зависимости от режима:
+   * - visual: 1.0 (оригинальные стилизованные радиусы)
+   * - realistic: пропорциональный логарифмический масштаб к Земле для сохранения видимости и реалистичного баланса
+   */
+  public calculateRadiusScale(realRadiusKm: number, earthRadiusKm: number = 6371.0, isRealistic: boolean = false): number {
+    if (!isRealistic) return 1.0
+    // В реалистичном режиме масштаб соотносится с реальными размерами
+    const ratio = realRadiusKm / earthRadiusKm
+    return Math.max(0.2, Math.min(ratio, 12))
   }
 
   /**
