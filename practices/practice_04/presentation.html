@@ -238,6 +238,7 @@
       overflow-x: auto;
       margin-top: 12px;
       color: #e2e8f0;
+      white-space: pre;
     }
 
     .code-box .highlight {
@@ -641,7 +642,7 @@ if (this.animationMixer) {
               <strong>compute_kepler_position:</strong> Расчет 3D-позиции (x, y, z) тела с учетом большой полуоси, эксцентриситета и наклона орбиты.
             </li>
             <li>
-              <strong>validate_orbit_timing:</strong> Проверка физической кинематики по 3-му закону Кеплера ($a^3 / T^2 \approx 1$).
+              <strong>validate_orbit_timing:</strong> Проверка физической кинематики по 3-му закону Кеплера (a³ / T² ≈ 1).
             </li>
             <li>
               <strong>get_scaled_system_data:</strong> Генерация масштабных коэффициентов для Three.js.
@@ -710,7 +711,7 @@ if (this.animationMixer) {
 }</span>
           </div>
           <p style="font-size: 13px; color: var(--accent-green); margin-top: 10px;">
-            ✓ Позиция в перигелии ($r = a(1-e) = 0.9833\text{ AU}$) рассчитана строго по формулам Кеплера.
+            ✓ Позиция в перигелии (r = a(1 - e) = 0.9833 AU) рассчитана строго по формулам Кеплера.
           </p>
         </div>
 
