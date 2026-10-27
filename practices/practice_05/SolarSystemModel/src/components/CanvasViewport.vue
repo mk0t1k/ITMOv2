@@ -6,6 +6,7 @@ import { filterCelestialBodies } from '../utils/celestialFilter'
 import type { HoverEventPayload } from '../core/RaycasterManager'
 import PlanetCard from './PlanetCard.vue'
 import TimeControls from './TimeControls.vue'
+import AstronomicalEventsPanel from './AstronomicalEventsPanel.vue'
 
 const containerRef = ref<HTMLDivElement | null>(null)
 // В соответствии с style-guide.md Three.js инстанс SolarScene оборачивается в shallowRef или чистую переменную
@@ -16,6 +17,7 @@ const timeSpeed = ref(1.0)
 const viewMode = ref<ViewMode>('visual')
 const selectedBody = ref<CelestialBodyData | null>(null)
 const searchQuery = ref('')
+const isPlannerOpen = ref(false)
 
 const allBodies: CelestialBodyData[] = [SUN_DATA, ...PLANETS_DATA]
 
@@ -102,6 +104,16 @@ const closeCard = () => {
   selectedBody.value = null
 }
 
+const togglePlanner = () => {
+  isPlannerOpen.value = !isPlannerOpen.value
+}
+
+const handleTimeJump = (targetTime: number | string) => {
+  const timeDays = typeof targetTime === 'string' ? parseFloat(targetTime) : targetTime
+  if (!solarSceneRef.value || Number.isNaN(timeDays)) return
+  solarSceneRef.value.jumpToTime(timeDays)
+}
+
 onMounted(() => {
   if (containerRef.value) {
     const scene = new SolarScene(containerRef.value)
@@ -179,15 +191,28 @@ onBeforeUnmount(() => {
         </nav>
       </div>
 
-      <button
-        v-if="selectedBody"
-        type="button"
-        class="reset-view-btn"
-        @click="resetView"
-      >
-        <span class="icon">⌖</span>
-        <span>Общий вид</span>
-      </button>
+      <div class="top-actions">
+        <button
+          type="button"
+          class="events-toggle-btn"
+          :class="{ active: isPlannerOpen }"
+          title="Планетарные события"
+          @click="togglePlanner"
+        >
+          <span class="icon">🪐</span>
+          <span>События</span>
+        </button>
+
+        <button
+          v-if="selectedBody"
+          type="button"
+          class="reset-view-btn"
+          @click="resetView"
+        >
+          <span class="icon">⌖</span>
+          <span>Общий вид</span>
+        </button>
+      </div>
     </header>
 
     <!-- Interactive Tooltip (Raycasting Hover) -->
@@ -205,6 +230,14 @@ onBeforeUnmount(() => {
       :body="selectedBody"
       @close="closeCard"
       @reset-view="resetView"
+    />
+
+    <!-- Astronomical Events Planner Panel -->
+    <AstronomicalEventsPanel
+      v-if="isPlannerOpen"
+      :available-planets="PLANETS_DATA"
+      @close="isPlannerOpen = false"
+      @time-jump="handleTimeJump"
     />
 
     <!-- Time and View Mode Controls (Feature B) -->
@@ -405,6 +438,43 @@ onBeforeUnmount(() => {
   color: #ffaa00;
   background: rgba(255, 170, 0, 0.15);
   border-color: rgba(255, 170, 0, 0.5);
+}
+
+.top-actions {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.events-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(13, 20, 36, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(80, 140, 240, 0.35);
+  border-radius: 10px;
+  color: #c9d1d9;
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.events-toggle-btn:hover {
+  background: rgba(20, 35, 65, 0.9);
+  border-color: rgba(0, 255, 204, 0.6);
+  color: #00ffcc;
+}
+
+.events-toggle-btn.active {
+  background: rgba(0, 255, 204, 0.15);
+  border-color: #00ffcc;
+  color: #00ffcc;
+  box-shadow: 0 0 12px rgba(0, 255, 204, 0.3);
 }
 
 .reset-view-btn {

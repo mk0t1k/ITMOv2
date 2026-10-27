@@ -302,6 +302,21 @@ export class SolarScene {
     return this.timeSpeed
   }
 
+  /**
+   * Jumps the simulation to a specific time in days.
+   * Repositions all planets to their calculated orbital angles at that moment.
+   */
+  public jumpToTime(targetTimeDays: number): void {
+    const twoPi = Math.PI * 2
+    this.planets.forEach((planet, index) => {
+      const initialAngle = (index * twoPi) / this.planets.length
+      const newAngle = ((initialAngle + planet.angularSpeed * targetTimeDays) % twoPi + twoPi) % twoPi
+      planet.angle = newAngle
+      const pos = this.orbitCalculator.calculatePosition(planet.data.distance, newAngle)
+      planet.mesh.position.set(pos.x, pos.y, pos.z)
+    })
+  }
+
   public setViewMode(mode: ViewMode): void {
     this.viewMode = mode
     this.applyViewModeScale()
