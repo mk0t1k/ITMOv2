@@ -15,7 +15,13 @@
         },
         "anthropic/claude-sonnet-4": {
           "name": "anthropic/claude-sonnet-4"
-        }
+        },
+        "google/gemini-3.8-flash": {
+          "name": "google/gemini-3.8-flash"
+        },
+	"openai/gpt-6-sol": {
+          "name": "GPT-6 Sol"
+        },
       }
     }
   }
