@@ -1,0 +1,5 @@
+schema: spec-driven
+
+rules:
+  design:
+    - "Объясни взаимодействие диаграммой Mermaid."

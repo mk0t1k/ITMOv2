@@ -19,7 +19,7 @@
         "google/gemini-3.8-flash": {
           "name": "google/gemini-3.8-flash"
         },
-	"openai/gpt-6-sol": {
+	      "openai/gpt-6-sol": {
           "name": "GPT-6 Sol"
         },
       }
