@@ -35,6 +35,16 @@ class ShopTest(unittest.TestCase):
         self.assertEqual(self.request("GET", "/profile?id=1", headers=alice)[1][0]["name"], "TEST_ALICE")
         self.assertEqual(self.request("GET", "/profile?id=2", headers=bob)[1][0]["name"], "TEST_BOB")
 
+    def test_object_access_requires_ownership(self):
+        alice = self.login()
+        self.assertEqual(self.request("GET", "/profile?id=2", headers=alice)[0], 403)
+        self.assertEqual(self.request("GET", "/orders", headers=alice)[1][0]["owner"], 1)
+        self.assertEqual(self.request("GET", "/assistant/context?order_id=2", headers=alice)[0], 404)
+
+    def test_role_header_cannot_grant_admin_access(self):
+        self.assertEqual(self.request("GET", "/admin/export", headers={"X-Role": "staff"})[0], 403)
+        self.assertEqual(self.request("GET", "/admin/export", headers={**self.login(), "X-Role": "staff"})[0], 403)
+
     def test_staff_can_export_with_staff_session(self):
         auth = {**self.login("staff", "learn-staff"), "X-Role": "staff"}
         status, profiles = self.request("GET", "/admin/export", headers=auth)
@@ -49,11 +59,17 @@ class ShopTest(unittest.TestCase):
         status, receipt = self.request("GET", "/files?user=alice&path=receipt.txt", headers=auth)
         self.assertEqual(status, 200)
         self.assertIn("TEST_ALICE", receipt["content"])
+        self.assertEqual(self.request("GET", "/files?user=bob&path=receipt.txt", headers=auth)[0], 403)
+        self.assertEqual(self.request("GET", "/files?user=alice&path=../private/operator-note.txt", headers=auth)[0], 403)
 
     def test_customer_can_buy_at_catalog_price(self):
         status, order = self.request("POST", "/orders", {"product": "lamp"}, self.login())
         self.assertEqual(status, 201)
         self.assertEqual((order["owner"], order["price"]), (1, 1500))
+
+    def test_price_cannot_be_overridden(self):
+        status, _ = self.request("POST", "/orders", {"product": "chair", "price": 0}, self.login())
+        self.assertEqual(status, 400)
 
     def test_unknown_product_rejected(self):
         self.assertEqual(self.request("POST", "/orders", {"product": "unknown"}, self.login())[0], 400)
@@ -62,6 +78,13 @@ class ShopTest(unittest.TestCase):
         auth = self.login()
         self.assertEqual(self.request("POST", "/reviews", {"product": "chair", "text": "Comfortable"}, auth)[0], 201)
         self.assertIn("Comfortable", self.request("GET", "/reviews/view", headers=auth)[1])
+
+    def test_review_html_is_escaped(self):
+        auth = self.login()
+        self.request("POST", "/reviews", {"product": "chair", "text": "<script>alert(1)</script>"}, auth)
+        page = self.request("GET", "/reviews/view", headers=auth)[1]
+        self.assertNotIn("<script>", page)
+        self.assertIn("&lt;script&gt;", page)
 
     def test_assistant_can_return_own_receipt(self):
         auth = self.login()
@@ -73,6 +96,18 @@ class ShopTest(unittest.TestCase):
         }, auth)
         self.assertEqual(status, 200)
         self.assertIn("TEST_ALICE", result["content"])
+
+    def test_assistant_rejects_unsafe_or_malformed_decisions(self):
+        auth = self.login()
+        for decision in (
+            {"tool": "delete_tree", "arguments": {"path": "."}},
+            {"tool": "export_profiles", "arguments": {}},
+            {"tool": "read_file", "arguments": {"path": "files/bob/receipt.txt"}},
+            {"tool": "read_file", "arguments": {}},
+        ):
+            with self.subTest(decision=decision):
+                status, _ = self.request("POST", "/assistant/execute", {"decision": decision}, auth)
+                self.assertIn(status, (400, 403))
 
 
 class SandboxTest(unittest.TestCase):
