@@ -1,0 +1,742 @@
+{
+  "name": "Workflow 1: Issue Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "events": [
+          "issues"
+        ],
+        "options": {}
+      },
+      "id": "gt-1",
+      "name": "Github Trigger",
+      "webhookId": "35a0f47d-70f7-43ef-8802-24e4b4c38c84",
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "position": [
+        112,
+        304
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "action_opened_cond",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-opened",
+      "name": "If: action == opened",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "author_assoc_cond",
+              "leftValue": "={{ $('Github Trigger').first().json.body.issue.author_association }}",
+              "rightValue": "NONE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-ftc",
+      "name": "If: First-time Contributor",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "first-time-contributor"
+            }
+          ]
+        }
+      },
+      "id": "add-ftc",
+      "name": "Add label: first-time-contributor",
+      "webhookId": "ec0c3252-62ee-476e-8b25-99d1ffd332b6",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        112
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "body": "=👋 Привет, @{{ $('Github Trigger').first().json.body.issue.user.login }}! Спасибо за создание вашего первого обращения в нашем проекте! Пожалуйста, ознакомьтесь с нашим руководством для контрибьюторов: [CONTRIBUTING.md](CONTRIBUTING.md)."
+      },
+      "id": "cmt-ftc",
+      "name": "Create Comment: Welcome",
+      "webhookId": "853ffd33-865c-4de6-b266-a403b2d31231",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        112
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "nqaZb32mXpOdrLEA",
+          "mode": "id"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "title": "={{ $json.body.issue.title }}",
+            "body": "={{ $json.body.issue.body }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "exec-sub",
+      "name": "Execute Sub-workflow: Issue Classifier",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1",
+                    "leftValue": "={{ $json.confidence }}",
+                    "rightValue": 0.8,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lt"
+                    }
+                  },
+                  {
+                    "id": "c2",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "unknown",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "or"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c3",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "bug",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c4",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "task",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c5",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "feature",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sw-triage",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        800,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "needs-triage"
+            }
+          ]
+        }
+      },
+      "id": "lbl-unk",
+      "name": "Add label: needs-triage",
+      "webhookId": "d26e6a64-7472-4ddb-85a2-5ab83b9ac0e8",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        272
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "bug"
+            }
+          ]
+        }
+      },
+      "id": "lbl-bug",
+      "name": "Add label: bug",
+      "webhookId": "ed5afebd-0d19-443b-b4b0-75b507c363a5",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        400
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "body": "=Спасибо за сообщение об ошибке, @{{ $('Github Trigger').first().json.body.issue.user.login }}! Мы зарегистрировали баг и приступим к его исправлению."
+      },
+      "id": "cmt-bug",
+      "name": "Comment: bug",
+      "webhookId": "fec521d5-78d8-40a5-b527-df3702c2234d",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        400
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "task"
+            }
+          ]
+        }
+      },
+      "id": "lbl-tsk",
+      "name": "Add label: task",
+      "webhookId": "69b3d28e-9a58-4840-82da-4f053d80479a",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        544
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "body": "=Спасибо за оформление задачи, @{{ $('Github Trigger').first().json.body.issue.user.login }}! Задача принята в работу команды."
+      },
+      "id": "cmt-tsk",
+      "name": "Comment: task",
+      "webhookId": "b39dac31-cdb2-45ec-bc00-0573e40ad9a3",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        544
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "edit",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "editFields": {
+          "labels": [
+            {
+              "label": "feature"
+            }
+          ]
+        }
+      },
+      "id": "lbl-fea",
+      "name": "Add label: feature",
+      "webhookId": "edd43903-5d81-46e0-b505-19ceab184f5e",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        688
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createComment",
+        "owner": {
+          "__rl": true,
+          "value": "mk0t1k",
+          "mode": "list",
+          "cachedResultName": "mk0t1k",
+          "cachedResultUrl": "https://github.com/mk0t1k"
+        },
+        "repository": {
+          "__rl": true,
+          "value": "SolarSystemModel",
+          "mode": "list",
+          "cachedResultName": "SolarSystemModel",
+          "cachedResultUrl": "https://github.com/mk0t1k/SolarSystemModel"
+        },
+        "issueNumber": "={{ $('Github Trigger').first().json.body.issue.number }}",
+        "body": "=Спасибо за предложение новой функциональности, @{{ $('Github Trigger').first().json.body.issue.user.login }}! Мы обязательно рассмотрим данную идею."
+      },
+      "id": "cmt-fea",
+      "name": "Comment: feature",
+      "webhookId": "d33afdc0-db15-42ce-9e38-1b6419572346",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        688
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Github Trigger": {
+      "main": [
+        [
+          {
+            "node": "If: action == opened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: action == opened": {
+      "main": [
+        [
+          {
+            "node": "If: First-time Contributor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Execute Sub-workflow: Issue Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If: First-time Contributor": {
+      "main": [
+        [
+          {
+            "node": "Add label: first-time-contributor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label: first-time-contributor": {
+      "main": [
+        [
+          {
+            "node": "Create Comment: Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Sub-workflow: Issue Classifier": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Add label: needs-triage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add label: bug",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add label: task",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Add label: feature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label: bug": {
+      "main": [
+        [
+          {
+            "node": "Comment: bug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label: task": {
+      "main": [
+        [
+          {
+            "node": "Comment: task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add label: feature": {
+      "main": [
+        [
+          {
+            "node": "Comment: feature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c597beaf-08bc-40c2-bfa7-feb484599f6c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"
+  },
+  "nodeGroups": [],
+  "id": "tsFOw328VZaEYJT2",
+  "tags": []
+}

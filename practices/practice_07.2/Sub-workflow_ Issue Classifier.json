@@ -1,0 +1,174 @@
+{
+  "name": "Sub-workflow: Issue Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "title"
+            },
+            {
+              "name": "body"
+            }
+          ]
+        }
+      },
+      "id": "01",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты классификатор GitHub Issues. Определи тип обращения строго из списка: bug | task | feature | unknown.\n\nКритерии категорий:\n- bug: сообщение об ошибке, сбое, исключении, некорректной работе существующего кода.\n- task: вопрос по использованию проекта, настройке, запуску, документации, просьба помочь или выполнить рутинную задачу (например, \"Как запустить...\", \"Подскажите...\", \"Обновить README\"). Если пользователь задаёт конкретный вопрос о работе проекта — это ВСЕГДА task с высоким confidence (>= 0.9).\n- feature: предложение добавить новую функцию или улучшение, которого ещё нет.\n- unknown: только бессмысленный, пустой или слишком общий текст без какой-либо конкретики (\"не работает\", \"помогите\", \"сломалось\").\n\nПримеры:\n1) Title: \"App crashes on large file\" | Body: \"Steps: 1. Open file > 10MB\" -> {\"type\": \"bug\", \"confidence\": 0.95}\n2) Title: \"Как запустить юнит-тесты локально?\" | Body: \"Подскажите команду для запуска\" -> {\"type\": \"task\", \"confidence\": 0.95}\n3) Title: \"Add CSV export\" | Body: \"Would be great to export results to CSV\" -> {\"type\": \"feature\", \"confidence\": 0.94}\n4) Title: \"Не работает\" | Body: \"Сломалось всё\" -> {\"type\": \"unknown\", \"confidence\": 0.4}\n\nТеперь классифицируй это обращение:\nЗаголовок: {{ $json.title }}\nОписание: {{ $json.body }}",
+        "hasOutputParser": true,
+        "batching": {}
+      },
+      "id": "02",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        352,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemini-3.8-flash",
+          "mode": "list",
+          "cachedResultName": "google/gemini-3.8-flash"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "03",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        352,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "s2ESk9k5Bpipg6uu",
+          "name": "OpenAI account 59"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"type\": \"bug\",\n  \"confidence\": 0.91\n}"
+      },
+      "id": "04",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        512,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "field_type",
+              "name": "type",
+              "value": "={{ $json.output.type }}",
+              "type": "string"
+            },
+            {
+              "id": "field_confidence",
+              "name": "confidence",
+              "value": "={{ $json.output.confidence }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "05",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        624,
+        208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "versionId": "1a9ed9eb-4920-40fa-9c98-07b2384e7281",
+  "meta": {
+    "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"
+  },
+  "nodeGroups": [],
+  "id": "nqaZb32mXpOdrLEA",
+  "tags": []
+}
