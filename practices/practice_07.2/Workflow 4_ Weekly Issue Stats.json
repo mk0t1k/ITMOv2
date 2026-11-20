@@ -1,0 +1,471 @@
+{
+  "name": "Workflow 4: Weekly Issue Stats",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * MON"
+            }
+          ]
+        }
+      },
+      "id": "sched-trig",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        112,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/mk0t1k/SolarSystemModel/issues?state=all&since={{ $now.minus({ days: 7 }).toISO() }}&per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-q1",
+      "name": "Get Issues Last 7 Days",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        80
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/search/issues?q=repo:mk0t1k/SolarSystemModel+is:issue+closed:>={{ $now.minus({ days: 7 }).toISODate() }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-q2",
+      "name": "Get Closed Issues Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        240
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/search/issues?q=repo:mk0t1k/SolarSystemModel+is:issue+is:open",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-q3",
+      "name": "Get Open Backlog Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        400
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/search/issues?q=repo:mk0t1k/SolarSystemModel+is:issue+label:needs-triage+is:open",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-q4",
+      "name": "Get Needs Triage Count",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        352,
+        560
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "i1hsKtRzH9ajs0sY",
+          "name": "GitHub account 69"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "merge-1",
+      "name": "Merge 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        560,
+        192
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "merge-2",
+      "name": "Merge 2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        560,
+        432
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "merge-3",
+      "name": "Merge 3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        752,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawItems = $('Get Issues Last 7 Days').all().map(i => i.json);\nconst issuesList = Array.isArray(rawItems) ? rawItems.flat() : rawItems;\n\nconst now = new Date();\nconst weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst newIssues = issuesList.filter(item => {\n  if (!item || item.pull_request) return false;\n  if (!item.created_at) return false;\n  return new Date(item.created_at) >= weekAgo;\n});\n\nlet bugs = 0;\nlet tasks = 0;\nlet features = 0;\nlet needsTriage = 0;\nlet others = 0;\n\nconst authorsMap = {};\n\nfor (const issue of newIssues) {\n  const author = issue.user?.login || 'unknown';\n  authorsMap[author] = (authorsMap[author] || 0) + 1;\n\n  const labels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name || '').toLowerCase());\n  let categorized = false;\n  if (labels.includes('bug')) {\n    bugs++;\n    categorized = true;\n  }\n  if (labels.includes('task')) {\n    tasks++;\n    categorized = true;\n  }\n  if (labels.includes('feature')) {\n    features++;\n    categorized = true;\n  }\n  if (labels.includes('needs-triage')) {\n    needsTriage++;\n    categorized = true;\n  }\n  if (!categorized) {\n    others++;\n  }\n}\n\nconst closedRes = $('Get Closed Issues Count').first()?.json || {};\nconst closedCount = Number(closedRes.total_count) || 0;\n\nconst openRes = $('Get Open Backlog Count').first()?.json || {};\nconst openBacklog = Number(openRes.total_count) || 0;\n\nconst triageRes = $('Get Needs Triage Count').first()?.json || {};\nconst triageCount = Number(triageRes.total_count) || 0;\n\nconst weekDate = now.toISOString().slice(0, 10);\nconst authorsList = Object.entries(authorsMap).map(([login, count]) => `${login} (${count})`);\n\nreturn [{\n  json: {\n    week_date: weekDate,\n    new_issues: newIssues.length,\n    closed_issues: closedCount,\n    open_backlog: openBacklog,\n    needs_triage: triageCount,\n    bugs: bugs,\n    tasks: tasks,\n    features: features,\n    others: others,\n    authors: authorsList.join(', ') || 'нет новых обращений'\n  }\n}];"
+      },
+      "id": "code-agg",
+      "name": "Aggregate Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "LxgXrni7FqnqZSsR",
+          "mode": "id"
+        }
+      },
+      "id": "dt-get",
+      "name": "Get Past Stats",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "alwaysOutputData": true,
+      "position": [
+        1120,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $('Aggregate Stats').first().json;\nconst rows = $('Get Past Stats').all().map(r => r.json).filter(r => r && r.week_date);\n\nconst prev = rows.length > 0 ? rows[rows.length - 1] : {\n  new_issues: 0,\n  closed_issues: 0,\n  open_backlog: 0,\n  needs_triage: 0,\n  bugs: 0,\n  tasks: 0,\n  features: 0,\n  others: 0\n};\n\nfunction formatDelta(currVal, prevVal) {\n  const c = Number(currVal) || 0;\n  const p = Number(prevVal) || 0;\n  const diff = c - p;\n  if (diff > 0) return `+${diff}`;\n  if (diff < 0) return `${diff}`;\n  return '0';\n}\n\nconst delta = {\n  new_issues: formatDelta(current.new_issues, prev.new_issues),\n  closed_issues: formatDelta(current.closed_issues, prev.closed_issues),\n  open_backlog: formatDelta(current.open_backlog, prev.open_backlog),\n  needs_triage: formatDelta(current.needs_triage, prev.needs_triage),\n  bugs: formatDelta(current.bugs, prev.bugs),\n  tasks: formatDelta(current.tasks, prev.tasks),\n  features: formatDelta(current.features, prev.features),\n  others: formatDelta(current.others, prev.others)\n};\n\nreturn [{\n  json: {\n    current: current,\n    delta: delta\n  }\n}];"
+      },
+      "id": "code-delta",
+      "name": "Calculate Delta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "LxgXrni7FqnqZSsR",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "week_date": "={{ $json.current.week_date }}",
+            "new_issues": "={{ $json.current.new_issues }}",
+            "closed_issues": "={{ $json.current.closed_issues }}",
+            "open_backlog": "={{ $json.current.open_backlog }}",
+            "needs_triage": "={{ $json.current.needs_triage }}",
+            "bugs": "={{ $json.current.bugs }}",
+            "tasks": "={{ $json.current.tasks }}",
+            "features": "={{ $json.current.features }}",
+            "others": "={{ $json.current.others }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "dt-insert",
+      "name": "Insert Current Stats",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1552,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты аналитик команды разработки. Твоя задача — составить краткую аналитическую сводку по динамике GitHub Issues за прошедшую неделю на русском языке (ровно 3-4 предложения).\n\nТекущие метрики:\n{{ JSON.stringify($json.current) }}\n\nИзменение метрик по сравнению с прошлой неделей:\n{{ JSON.stringify($json.delta) }}\n\nНапиши связный, профессиональный комментарий: обрати внимание на скорость закрытия issues по отношению к новым, долю багов и задач, требующих триажа, а также на общую динамику бэклога.",
+        "batching": {}
+      },
+      "id": "ai-chain",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1552,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemini-3.8-flash",
+          "mode": "list",
+          "cachedResultName": "google/gemini-3.8-flash"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "ai-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1552,
+        624
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "s2ESk9k5Bpipg6uu",
+          "name": "OpenAI account 59"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "mkot07@yandex.ru",
+        "toEmail": "20mk07@gmail.com",
+        "subject": "=Еженедельная статистика GitHub Issues ({{ $('Calculate Delta').item.json.current.week_date }})",
+        "html": "=<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 20px; color: #24292f; border: 1px solid #d0d7de; border-radius: 8px;\">\n  <h2 style=\"color: #0969da; margin-top: 0; border-bottom: 2px solid #eaeef2; padding-bottom: 10px;\">\n    📊 Еженедельная статистика GitHub Issues ({{ $('Calculate Delta').item.json.current.week_date }})\n  </h2>\n  \n  <p style=\"font-size: 14px; color: #57606a;\">\n    Автоматический дайджест состояния репозитория за прошедшие 7 дней.\n  </p>\n\n  <table style=\"width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; text-align: left;\">\n    <thead>\n      <tr style=\"background-color: #f6f8fa; border-bottom: 2px solid #d0d7de;\">\n        <th style=\"padding: 10px 12px; border: 1px solid #d0d7de;\">Метрика</th>\n        <th style=\"padding: 10px 12px; border: 1px solid #d0d7de; text-align: center;\">За эту неделю</th>\n        <th style=\"padding: 10px 12px; border: 1px solid #d0d7de; text-align: center;\">Δ к прошлой неделе</th>\n      </tr>\n    </thead>\n    <tbody>\n      <tr>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; font-weight: 600;\">Всего новых Issues</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.new_issues }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center; color: #0969da; font-weight: 600;\">{{ $('Calculate Delta').item.json.delta.new_issues }}</td>\n      </tr>\n      <tr style=\"background-color: #fcfcfc;\">\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; font-weight: 600;\">Закрыто Issues</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.closed_issues }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center; color: #1a7f37; font-weight: 600;\">{{ $('Calculate Delta').item.json.delta.closed_issues }}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de;\">Ошибки (Bugs)</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.bugs }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.delta.bugs }}</td>\n      </tr>\n      <tr style=\"background-color: #fcfcfc;\">\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de;\">Задачи (Tasks)</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.tasks }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.delta.tasks }}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de;\">Новые возможности (Features)</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.features }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.delta.features }}</td>\n      </tr>\n      <tr style=\"background-color: #fff8c5;\">\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; font-weight: 600;\">Ожидают триажа (Needs-triage)</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center; font-weight: 600;\">{{ $('Calculate Delta').item.json.current.needs_triage }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center; font-weight: 600;\">{{ $('Calculate Delta').item.json.delta.needs_triage }}</td>\n      </tr>\n      <tr>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de;\">Открытый бэклог (всего)</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.current.open_backlog }}</td>\n        <td style=\"padding: 8px 12px; border: 1px solid #d0d7de; text-align: center;\">{{ $('Calculate Delta').item.json.delta.open_backlog }}</td>\n      </tr>\n    </tbody>\n  </table>\n\n  <div style=\"background-color: #f6f8fa; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #0969da;\">\n    <h4 style=\"margin: 0 0 6px 0; color: #24292f;\">👥 Авторы новых обращений за неделю:</h4>\n    <p style=\"margin: 0; font-size: 13px; color: #57606a;\">{{ $('Calculate Delta').item.json.current.authors }}</p>\n  </div>\n\n  <div style=\"background-color: #ddf4ff; border: 1px solid #54aeff; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px;\">\n    <h3 style=\"margin-top: 0; color: #0969da; font-size: 16px;\">🤖 AI-комментарий недели</h3>\n    <p style=\"margin-bottom: 0; font-size: 14px; line-height: 1.5; color: #1f2328;\">\n      {{ $json.text }}\n    </p>\n  </div>\n\n  <hr style=\"border: 0; border-top: 1px solid #eaeef2; margin: 20px 0;\">\n  <p style=\"font-size: 11px; color: #8c959f; text-align: center; margin: 0;\">\n    Сгенерировано автоматически с помощью n8n Workflow 4: Weekly Issue Stats\n  </p>\n</div>",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send Email",
+      "webhookId": "6ac5c318-f626-486e-832e-a0b4a4687cc6",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1760,
+        432
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "wDoUF7jxU5lj5beH",
+          "name": "SMTP account 17"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Issues Last 7 Days",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Closed Issues Count",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Open Backlog Count",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Needs Triage Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issues Last 7 Days": {
+      "main": [
+        [
+          {
+            "node": "Merge 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Closed Issues Count": {
+      "main": [
+        [
+          {
+            "node": "Merge 1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Open Backlog Count": {
+      "main": [
+        [
+          {
+            "node": "Merge 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Needs Triage Count": {
+      "main": [
+        [
+          {
+            "node": "Merge 2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge 1": {
+      "main": [
+        [
+          {
+            "node": "Merge 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge 2": {
+      "main": [
+        [
+          {
+            "node": "Merge 3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge 3": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Stats": {
+      "main": [
+        [
+          {
+            "node": "Get Past Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Past Stats": {
+      "main": [
+        [
+          {
+            "node": "Calculate Delta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Delta": {
+      "main": [
+        [
+          {
+            "node": "Insert Current Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "versionId": "d4d5fed2-f564-407d-809b-d45d7731a64c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "68dbbb4e8fa686c3fd4e9982ade6836edb66976f207553e7ac22df961581c78c"
+  },
+  "nodeGroups": [],
+  "id": "GswnT5hmn1vL4cZh",
+  "tags": []
+}
